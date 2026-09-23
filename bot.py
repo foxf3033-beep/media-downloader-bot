@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من (TikTok, Instagram, YouTube) وسأقوم بتحميله لك فوراً وبدون علامة مائية! 📥"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية! 📥"
     )
 
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -20,30 +20,36 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not (url.startswith("http://") or url.startswith("https://")):
         return
 
-    status_msg = await update.message.reply_text("⏳ جاري التحميل لتجاوز الحظر...")
+    status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     try:
-        # استخدام API سريع لتنزيل مقاطع TikTok بدون علامة مائية وتجاوز حظر الـ IP
-        if "tiktok.com" in url:
-            api_url = f"https://api.tiklydown.eu.org/api/download?url={url}"
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(api_url)
-                data = response.json()
-                
-                # الحصول على رابط الفيديو المباشر
-                video_url = data.get("video", {}).get("noWatermark") or data.get("video", {}).get("watermark")
-                
-                if video_url:
-                    await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
-                    await update.message.reply_video(video=video_url)
-                    await status_msg.delete()
-                    return
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            # 1. تتبع الرابط المختصر للوصول للرابط المباشر
+            resp = await client.get(url)
+            final_url = str(resp.url)
 
-        await status_msg.edit_text("❌ تعذر تحميل هذا الفيديو، تأكد من صحة الرابط.")
+            # 2. الاستعلام من API متلائم مع جميع صيغ تيك توك
+            api_endpoint = f"https://api.tiklydown.eu.org/api/download?url={final_url}"
+            api_resp = await client.get(api_endpoint)
+            data = api_resp.json()
+
+            # استخراج رابط الفيديو
+            video_url = None
+            if "video" in data:
+                video_url = data["video"].get("noWatermark") or data["video"].get("watermark")
+            elif "url" in data:
+                video_url = data.get("url")
+
+            if video_url:
+                await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
+                await update.message.reply_video(video=video_url)
+                await status_msg.delete()
+            else:
+                await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. جرب رابطاً آخر.")
 
     except Exception as e:
-        logging.error(f"Error: {e}")
-        await status_msg.edit_text("❌ حدث خطأ أثناء الاتصال بالسيرفر. أعد المحاولة برابط آخر.")
+        logging.error(f"Error handling request: {e}")
+        await status_msg.edit_text("❌ تعذر تحميل هذا الفيديو حالياً. تأكد من صحة الرابط أو حاول لاحقاً.")
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
