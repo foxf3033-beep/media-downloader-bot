@@ -11,14 +11,13 @@ logging.basicConfig(
 
 BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
-# معرف القناة الأولى الخاصة بك
+# معرف القناة الخاصة بك
 CHANNEL_1 = "@my_tiktok_channel_4"
-# إذا كان لديك قناة ثانية استبدل المعرف هنا، أو يمكنك ترك نفس القناة مؤقتاً
 CHANNEL_2 = "@my_tiktok_channel_4"
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """التحقق من اشتراك المستخدم في القنوات"""
-    channels = list(set([CHANNEL_1, CHANNEL_2]))  # لإزالة التكرار إن وجد
+    channels = list(set([CHANNEL_1, CHANNEL_2]))
     for ch in channels:
         try:
             member = await context.bot.get_chat_member(chat_id=ch, user_id=user_id)
@@ -26,6 +25,7 @@ async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
                 return False
         except TelegramError as e:
             logging.error(f"Failed to check membership for channel {ch}: {e}")
+            # إذا حدث خطأ تقني في فحص القناة (مثل عدم كون البوت مشرفاً)، نعتبره غير مشترك لتجنب تجاوز القيد
             return False
     return True
 
@@ -68,7 +68,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # فحص الاشتراك قبل المعالجة
+    # فحص الاشتراك بدقة
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
             "⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت:",
@@ -83,11 +83,16 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
 
     try:
         async with httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True, headers=headers) as client:
+            # معالجة الروابط المختصرة وتتبع إعادة التوجيه للحصول على الرابط الكامل
+            if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
+                resp = await client.get(url)
+                url = str(resp.url)
+
             api_endpoint = "https://www.tikwm.com/api/"
             response = await client.post(api_endpoint, data={"url": url})
             res_data = response.json()
