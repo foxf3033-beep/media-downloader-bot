@@ -13,7 +13,7 @@ BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية! 🎂"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية!"
     )
 
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -25,36 +25,27 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.tikwm.com/"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
     }
 
     try:
         async with httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True, headers=headers) as client:
-            # 1. جلب الصفحة/الرابط للتعامل مع التحويلات المختصرة
-            resp = await client.get(url)
-            final_url = str(resp.url)
-
-            # 2. الاستعلام من API TikWM
             api_endpoint = "https://www.tikwm.com/api/"
-            api_resp = await client.post(api_endpoint, data={"url": final_url})
-            
-            # التحقق من أن الاستجابة تحتوي على نص قبل تحويلها لـ JSON
-            if api_resp.status_code == 200 and api_resp.text:
-                res_data = api_resp.json()
+            response = await client.post(api_endpoint, data={"url": url})
+            res_data = response.json()
+
+            if res_data.get("code") == 0 and "data" in res_data:
+                video_data = res_data["data"]
+                play_url = video_data.get("play") or video_data.get("wmplay")
                 
-                if res_data.get("code") == 0 and "data" in res_data:
-                    video_data = res_data["data"]
-                    play_url = video_data.get("play") or video_data.get("wmplay")
-                    
-                    if play_url:
-                        if play_url.startswith("/"):
-                            play_url = f"https://www.tikwm.com{play_url}"
-                            
-                        await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
-                        await update.message.reply_video(video=play_url)
-                        await status_msg.delete()
-                        return
+                if play_url:
+                    if play_url.startswith("/"):
+                        play_url = f"https://www.tikwm.com{play_url}"
+                        
+                    await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
+                    await update.message.reply_video(video=play_url)
+                    await status_msg.delete()
+                    return
 
             await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب مرة أخرى.")
 
