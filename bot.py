@@ -20,35 +20,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
 
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if not ("tiktok.com" in url or "vt.tiktok.com" in url):
         return
 
     status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
-            # 1. تتبع الرابط المختصر للوصول للرابط المباشر
-            resp = await client.get(url)
-            final_url = str(resp.url)
+        async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            # استخدام API TikWM المباشر والسريع
+            api_url = "https://www.tikwm.com/api/"
+            response = await client.post(api_url, data={"url": url})
+            res_data = response.json()
 
-            # 2. الاستعلام من API متلائم مع جميع صيغ تيك توك
-            api_endpoint = f"https://api.tiklydown.eu.org/api/download?url={final_url}"
-            api_resp = await client.get(api_endpoint)
-            data = api_resp.json()
+            if res_data.get("code") == 0 and "data" in res_data:
+                video_data = res_data["data"]
+                # جلب رابط الفيديو بدون علامة مائية
+                play_url = video_data.get("play") or video_data.get("wmplay")
+                
+                if play_url:
+                    # إضافة النطاق إذا كان الرابط نسبياً
+                    if play_url.startswith("/"):
+                        play_url = f"https://www.tikwm.com{play_url}"
+                        
+                    await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
+                    await update.message.reply_video(video=play_url)
+                    await status_msg.delete()
+                    return
 
-            # استخراج رابط الفيديو
-            video_url = None
-            if "video" in data:
-                video_url = data["video"].get("noWatermark") or data["video"].get("watermark")
-            elif "url" in data:
-                video_url = data.get("url")
-
-            if video_url:
-                await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
-                await update.message.reply_video(video=video_url)
-                await status_msg.delete()
-            else:
-                await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. جرب رابطاً آخر.")
+            await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب مرة أخرى.")
 
     except Exception as e:
         logging.error(f"Error handling request: {e}")
