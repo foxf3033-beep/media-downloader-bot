@@ -29,6 +29,7 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     try:
+        # الاتصال مباشر بدون بروكسي
         async with httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True, headers=headers) as client:
             api_endpoint = "https://www.tikwm.com/api/"
             response = await client.post(api_endpoint, data={"url": url})
