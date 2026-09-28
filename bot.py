@@ -1,30 +1,32 @@
-import os
 import logging
 import httpx
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
+# إعداد السجلات لمتابعة أي أخطاء
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-logging.basicConfig(level=logging.INFO)
+BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية! 📥"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية! 🎂"
     )
 
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
-    
+
     if not (url.startswith("http://") or url.startswith("https://")):
         return
 
     status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     try:
-                async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
-
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
             # 1. تتبع الرابط المختصر للوصول للرابط المباشر
             resp = await client.get(url)
             final_url = str(resp.url)
@@ -50,7 +52,7 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"Error handling request: {e}")
-        await status_msg.edit_text("❌ تعذر تحميل هذا الفيديو حالياً. تأكد من صحة الرابط أو حاول لاحقاً.")
+        await status_msg.edit_text("❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط أو حاول لاحقاً.")
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
