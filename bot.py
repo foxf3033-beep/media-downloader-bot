@@ -23,7 +23,8 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0‚ verify=False) as client:
+                async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=False) as client:
+
             # 1. تتبع الرابط المختصر للوصول للرابط المباشر
             resp = await client.get(url)
             final_url = str(resp.url)
