@@ -89,7 +89,7 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     # حفظ الرابط مؤقتاً لهذا المستخدم
     USER_URLS[user_id] = url
 
-    # إرسال رسالة واحدة فقط تحتوي على الخطوة الأولى المطلوبة
+    # إرسال رسالة الخطوة الأولى الجديدة فقط (مع إلغاء القديمة تماماً)
     keyboard = [
         [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
         [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا للمتابعة", callback_data="show_download_btn")]
@@ -111,7 +111,7 @@ async def show_download_button(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # تحويل الرسالة لتصبح خاصة بزر التحميل فقط بعد الضغط على التأكيد
+    # تحديث نفس الرسالة لتصبح خاصة بزر التحميل النهائي فقط
     keyboard = [
         [InlineKeyboardButton("📥 اضغط هنا لتحميل الفيديو بدون علامة مائية", callback_data="get_final_video")]
     ]
@@ -184,7 +184,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
     app.add_handler(CallbackQueryHandler(show_download_button, pattern="^show_download_btn$"))
-    app.add_handler(CallbackQueryHandler(send_final_video, pattern="^get_final_video$"))
+    app.add_handler(CallbackQueryHandler(send_final_version := send_final_video, pattern="^get_final_video$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
