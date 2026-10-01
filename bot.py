@@ -18,7 +18,7 @@ CHANNEL_2 = "@my_tiktok_channel_4"
 # رابط الإعلانات المباشر الخاص بك
 AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
 
-# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين مؤقتاً لحين الضغط على الزر
+# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين مؤقتاً لحين الضغط على الأزرار
 USER_URLS = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -89,26 +89,46 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     # حفظ الرابط مؤقتاً لهذا المستخدم
     USER_URLS[user_id] = url
 
-    # إرسال طلب الدخول للرابط الإعلاني أولاً كشرط للحصول على الفيديو
+    # الخطوة الأولى: إرسال زر الإعلان فقط بشكل منفصل
     keyboard = [
-        [InlineKeyboardButton("🔗 1. اضغط هنا لفتح الرابط ودعم البوت أولاً", url=AD_LINK)],
-        [InlineKeyboardButton("📥 2. اضغط هنا بعدي لفتح وتحميل الفيديو", callback_data="get_video")]
+        [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
+        [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا للمتابعة", callback_data="show_download_btn")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📌 **خطوة واحدة متبقية!**\n\n"
-        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم (الرقم 1)** لفتح الإعلان، ثم اضغط على **زر التحميل (الرقم 2)**:",
+        "📌 **الخطوة الأولى:**\n\n"
+        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً لتصفح الإعلان، ثم اضغط على زر التأكيد أدناه:",
         reply_markup=reply_markup
     )
 
-async def send_video_after_ad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def show_download_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if user_id not in USER_URLS:
+        await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
+        return
+
+    # الخطوة الثانية: تحويل الرسالة لتصبح خاصة بزر التحميل فقط
+    keyboard = [
+        [InlineKeyboardButton("📥 اضغط هنا لتحميل الفيديو بدون علامة مائية", callback_data="get_final_video")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.edit_text(
+        "🎉 **ممتاز! تم التحقق من تفاعلك.**\n\n"
+        "الآن يمكنك الضغط على الزر أدناه لتنزيل الفيديو الخاص بك فوراً:",
+        reply_markup=reply_markup
+    )
+
+async def send_final_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     
-    # التأكد من أن لديه رابط محفوظ
     if user_id not in USER_URLS:
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال رابط تيك توك من جديد.", show_alert=True)
         return
@@ -141,11 +161,11 @@ async def send_video_after_ad(update: Update, context: ContextTypes.DEFAULT_TYPE
                         
                     await status_msg.delete()
                     
-                    # إرسال الفيديو بعد اجتياز شرط النقر
+                    # إرسال الفيديو النهائي للمستخدم
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
-                        caption="✅ شكراً لدعمك! تم تحميل الفيديو بنجاح بدون علامة مائية. 🚀"
+                        caption="✅ تفضل فيديو تيك توك الخاص بك بدون علامة مائية! 🚀\n\n💻 **المطور:** wd wil"
                     )
                     
                     # حذف الرابط المخزن بعد الاستخدام
@@ -163,7 +183,8 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(CallbackQueryHandler(send_video_after_ad, pattern="^get_video$"))
+    app.add_handler(CallbackQueryHandler(show_download_button, pattern="^show_download_btn$"))
+    app.add_handler(CallbackQueryHandler(send_final_video, pattern="^get_final_video$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
