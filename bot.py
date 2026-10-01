@@ -83,21 +83,21 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
 
     USER_URLS[user_id] = url
 
-    # يظهر زر رابط الإعلان فقط في البداية (مع زر callback لتتبع الضغط عليه)
+    # الأزرار بالشكل الاحترافي المطلوب
     keyboard = [
-        [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
-        [InlineKeyboardButton("✅ اضغط هنا بعد فتح رابط الإعلان", callback_data="ad_clicked")]
+        [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان", url=AD_LINK)],
+        [InlineKeyboardButton("📥 اضغط هنا بعد مشاهدة الإعلان لتحميل الفيديو", callback_data="process_download")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📌 **خطوة واحدة متبقية:**\n\n"
-        "1️⃣ اضغط على زر رابط الإعلان أعلاه وتصفحه.\n"
-        "2️⃣ ثم اضغط على زر التأكيد أدناه للمتابعة:",
+        "📌 **خطوة واحدة لتحميل الفيديو:**\n\n"
+        "1. افتح رابط الدعم أعلاه.\n"
+        "2. اضغط على زر التحميل أدناه مباشرة:",
         reply_markup=reply_markup
     )
 
-async def handle_ad_clicked(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -106,13 +106,14 @@ async def handle_ad_clicked(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # بمجرد الضغط، يتم إخفاء زر الإعلان وإظهار رسالة الانتظار 5 ثوانٍ
-    await query.message.edit_text("⏳ تم رصد تفاعلك، يرجى الانتظار 5 ثوانٍ ليتم جلب الفيديو...")
+    url = USER_URLS[user_id]
 
+    # رسالة الانتظار لمدة 5 ثوانٍ
+    await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
+
+    # الانتظار لمدة 5 ثوانٍ
     await asyncio.sleep(5)
 
-    # بعد الـ 5 ثوانٍ، نبدأ بجلب الفيديو مباشرة
-    url = USER_URLS[user_id]
     await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
 
     headers = {
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(CallbackQueryHandler(handle_ad_clicked, pattern="^ad_clicked$"))
+    app.add_handler(CallbackQueryHandler(handle_process_download, pattern="^process_download$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
