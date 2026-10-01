@@ -15,8 +15,8 @@ BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 CHANNEL_1 = "@my_tiktok_channel_4"
 CHANNEL_2 = "@my_tiktok_channel_4"
 
-# رابط الإعلانات المباشر الخاص بك (Direct Link من Adsterra)
-AD_LINK = "https://your-ad-link-here.com"
+# رابط الإعلانات المباشر الخاص بك (تمت إضافته بنجاح)
+AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """التحقق من اشتراك المستخدم في القنوات"""
