@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -18,7 +19,7 @@ CHANNEL_2 = "@my_tiktok_channel_4"
 # رابط الإعلانات المباشر الخاص بك
 AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
 
-# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين مؤقتاً لحين الضغط على الأزرار
+# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين
 USER_URLS = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -89,20 +90,20 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     # حفظ الرابط مؤقتاً لهذا المستخدم
     USER_URLS[user_id] = url
 
-    # إرسال رسالة الخطوة الأولى الجديدة فقط (مع إلغاء القديمة تماماً)
+    # إرسال الرسالة الأولى بزار واحد فقط (رابط الإعلان)
     keyboard = [
         [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
-        [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا للمتابعة", callback_data="show_download_btn")]
+        [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا", callback_data="wait_timer")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📌 **الخطوة الأولى:**\n\n"
-        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً لتصفح الإعلان، ثم اضغط على زر التأكيد أدناه:",
+        "📌 **خطوة واحدة متبقية:**\n\n"
+        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً، ثم الضغط على زر التأكيد أدناه:",
         reply_markup=reply_markup
     )
 
-async def show_download_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_timer_and_show_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -111,7 +112,13 @@ async def show_download_button(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # تحديث نفس الرسالة لتصبح خاصة بزر التحميل النهائي فقط
+    # الخطوة الأولى بعد الضغط: إظهار رسالة الانتظار لمدة 5 ثوانٍ
+    await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
+
+    # الانتظار لمدة 5 ثوانٍ
+    await asyncio.sleep(5)
+
+    # بعد مرور الـ 5 ثوانٍ: عرض زر التحميل النهائي
     keyboard = [
         [InlineKeyboardButton("📥 اضغط هنا لتحميل الفيديو بدون علامة مائية", callback_data="get_final_video")]
     ]
@@ -183,8 +190,8 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(CallbackQueryHandler(show_download_button, pattern="^show_download_btn$"))
-    app.add_handler(CallbackQueryHandler(send_final_version := send_final_video, pattern="^get_final_video$"))
+    app.add_handler(CallbackQueryHandler(handle_timer_and_show_download, pattern="^wait_timer$"))
+    app.add_handler(CallbackQueryHandler(send_final_video, pattern="^get_final_video$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
