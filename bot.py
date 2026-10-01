@@ -12,18 +12,14 @@ logging.basicConfig(
 
 BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
-# معرف القناة الخاصة بك للاشتراك الإجباري
 CHANNEL_1 = "@my_tiktok_channel_4"
 CHANNEL_2 = "@my_tiktok_channel_4"
 
-# رابط الإعلانات المباشر الخاص بك
 AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
 
-# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين
 USER_URLS = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """التحقق من اشتراك المستخدم في القنوات"""
     channels = list(set([CHANNEL_1, CHANNEL_2]))
     for ch in channels:
         try:
@@ -36,7 +32,6 @@ async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
     return True
 
 def get_subscribe_keyboard() -> InlineKeyboardMarkup:
-    """إنشاء أزرار القنوات مع زر التحقق من الاشتراك"""
     keyboard = [
         [InlineKeyboardButton("📢 قناة البوت الرسمية", url=f"https://t.me/{CHANNEL_1.replace('@', '')}")],
         [InlineKeyboardButton("✅ اشتركت، تحقق الآن", callback_data="check_sub")]
@@ -75,7 +70,6 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # فحص الاشتراك الإجباري أولاً
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
             "⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت:",
@@ -87,10 +81,9 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     if "tiktok.com" not in url:
         return
 
-    # حفظ الرابط مؤقتاً لهذا المستخدم
     USER_URLS[user_id] = url
 
-    # إرسال الرسالة الأولى بزار واحد فقط (رابط الإعلان)
+    # يظهر زر رابط الإعلان فقط في البداية
     keyboard = [
         [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
         [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا", callback_data="wait_timer")]
@@ -112,13 +105,12 @@ async def handle_timer_and_show_download(update: Update, context: ContextTypes.D
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # الخطوة الأولى بعد الضغط: إظهار رسالة الانتظار لمدة 5 ثوانٍ
+    # رسالة الانتظار لمدة 5 ثوانٍ بعد الضغط على زر التأكيد
     await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
 
-    # الانتظار لمدة 5 ثوانٍ
     await asyncio.sleep(5)
 
-    # بعد مرور الـ 5 ثوانٍ: عرض زر التحميل النهائي
+    # إظهار زر التحميل النهائي في نفس الرسالة
     keyboard = [
         [InlineKeyboardButton("📥 اضغط هنا لتحميل الفيديو بدون علامة مائية", callback_data="get_final_video")]
     ]
@@ -168,14 +160,12 @@ async def send_final_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                     await status_msg.delete()
                     
-                    # إرسال الفيديو النهائي للمستخدم
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
                         caption="✅ تفضل فيديو تيك توك الخاص بك بدون علامة مائية! 🚀\n\n💻 **المطور:** wd wil"
                     )
                     
-                    # حذف الرابط المخزن بعد الاستخدام
                     del USER_URLS[user_id]
                     return
 
