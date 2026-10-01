@@ -15,8 +15,11 @@ BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 CHANNEL_1 = "@my_tiktok_channel_4"
 CHANNEL_2 = "@my_tiktok_channel_4"
 
-# رابط الإعلانات المباشر الخاص بك (تمت إضافته بنجاح)
+# رابط الإعلانات المباشر الخاص بك
 AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
+
+# مخزن مؤقت لحفظ روابط تيك توك للمستخدمين مؤقتاً لحين الضغط على الزر
+USER_URLS = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """التحقق من اشتراك المستخدم في القنوات"""
@@ -32,7 +35,7 @@ async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
     return True
 
 def get_subscribe_keyboard() -> InlineKeyboardMarkup:
-    """إنشاء أزرار القنوات مع زر التحقق"""
+    """إنشاء أزرار القنوات مع زر التحقق من الاشتراك"""
     keyboard = [
         [InlineKeyboardButton("📢 قناة البوت الرسمية", url=f"https://t.me/{CHANNEL_1.replace('@', '')}")],
         [InlineKeyboardButton("✅ اشتركت، تحقق الآن", callback_data="check_sub")]
@@ -50,12 +53,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية!\n\n"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحجهيزه لك فوراً!\n\n"
         "💻 **المطور:** wd wil"
     )
 
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الضغط على زر التحقق من الاشتراك"""
     query = update.callback_query
     await query.answer()
     
@@ -69,7 +71,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     else:
         await query.answer("❌ لم تشترك في القناة بعد! يرجى الاشتراك ثم الضغط على الزر مرة أخرى.", show_alert=True)
 
-async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     # فحص الاشتراك الإجباري أولاً
@@ -84,7 +86,36 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "tiktok.com" not in url:
         return
 
-    status_msg = await update.message.reply_text("⏳ جاري استخراج الفيديو...")
+    # حفظ الرابط مؤقتاً لهذا المستخدم
+    USER_URLS[user_id] = url
+
+    # إرسال طلب الدخول للرابط الإعلاني أولاً كشرط للحصول على الفيديو
+    keyboard = [
+        [InlineKeyboardButton("🔗 1. اضغط هنا لفتح الرابط ودعم البوت أولاً", url=AD_LINK)],
+        [InlineKeyboardButton("📥 2. اضغط هنا بعدي لفتح وتحميل الفيديو", callback_data="get_video")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📌 **خطوة واحدة متبقية!**\n\n"
+        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم (الرقم 1)** لفتح الإعلان، ثم اضغط على **زر التحميل (الرقم 2)**:",
+        reply_markup=reply_markup
+    )
+
+async def send_video_after_ad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    
+    # التأكد من أن لديه رابط محفوظ
+    if user_id not in USER_URLS:
+        await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال رابط تيك توك من جديد.", show_alert=True)
+        return
+
+    url = USER_URLS[user_id]
+    
+    status_msg = await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -92,7 +123,6 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True, headers=headers) as client:
-            # معالجة الروابط المختصرة وتتبع إعادة التوجيه
             if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
                 resp = await client.get(url)
                 url = str(resp.url)
@@ -111,20 +141,18 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         
                     await status_msg.delete()
                     
-                    # زر إعلاني تحت الفيديو لتحقيق الأرباح
-                    keyboard = [
-                        [InlineKeyboardButton("🔗 اضغط هنا لدعم البوت وتوليد رابط إضافي", url=AD_LINK)]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-
-                    await update.message.reply_video(
+                    # إرسال الفيديو بعد اجتياز شرط النقر
+                    await context.bot.send_video(
+                        chat_id=query.message.chat_id,
                         video=play_url, 
-                        caption="✅ تم تحميل الفيديو بنجاح بدون علامة مائية!\n💡 لدعم استمرار البوت مجاناً، نرجو النقر على الزر أدناه:",
-                        reply_markup=reply_markup
+                        caption="✅ شكراً لدعمك! تم تحميل الفيديو بنجاح بدون علامة مائية. 🚀"
                     )
+                    
+                    # حذف الرابط المخزن بعد الاستخدام
+                    del USER_URLS[user_id]
                     return
 
-            await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب مرة أخرى.")
+            await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب إرساله مرة أخرى.")
 
     except Exception as e:
         logging.error(f"Error handling request: {e}")
@@ -135,6 +163,7 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_media))
+    app.add_handler(CallbackQueryHandler(send_video_after_ad, pattern="^get_video$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
