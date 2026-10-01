@@ -86,17 +86,17 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     # يظهر زر رابط الإعلان فقط في البداية
     keyboard = [
         [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
-        [InlineKeyboardButton("✅ لقد شاهدت الإعلان، اضغط هنا", callback_data="wait_timer")]
+        [InlineKeyboardButton("✅ اضغط هنا بعد مشاهدة الإعلان", callback_data="start_timer")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         "📌 **خطوة واحدة متبقية:**\n\n"
-        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً، ثم الضغط على زر التأكيد أدناه:",
+        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً، ثم اضغط على الزر أدناه:",
         reply_markup=reply_markup
     )
 
-async def handle_timer_and_show_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_timer_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -105,36 +105,16 @@ async def handle_timer_and_show_download(update: Update, context: ContextTypes.D
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # رسالة الانتظار لمدة 5 ثوانٍ بعد الضغط على زر التأكيد
+    url = USER_URLS[user_id]
+
+    # إظهار رسالة الانتظار لمدة 5 ثوانٍ (كما طلبت تماماً)
     await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
 
+    # الانتظار لمدة 5 ثوانٍ
     await asyncio.sleep(5)
 
-    # إظهار زر التحميل النهائي في نفس الرسالة
-    keyboard = [
-        [InlineKeyboardButton("📥 اضغط هنا لتحميل الفيديو بدون علامة مائية", callback_data="get_final_video")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.message.edit_text(
-        "🎉 **ممتاز! تم التحقق من تفاعلك.**\n\n"
-        "الآن يمكنك الضغط على الزر أدناه لتنزيل الفيديو الخاص بك فوراً:",
-        reply_markup=reply_markup
-    )
-
-async def send_final_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    
-    if user_id not in USER_URLS:
-        await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال رابط تيك توك من جديد.", show_alert=True)
-        return
-
-    url = USER_URLS[user_id]
-    
-    status_msg = await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
+    # تحديث النص إلى جاري استخراج الفيديو
+    await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -158,8 +138,10 @@ async def send_final_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if play_url.startswith("/"):
                         play_url = f"https://www.tikwm.com{play_url}"
                         
-                    await status_msg.delete()
+                    # حذف رسالة الانتظار
+                    await query.message.delete()
                     
+                    # إرسال الفيديو النهائي مباشرة للمستخدم
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
@@ -169,19 +151,18 @@ async def send_final_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     del USER_URLS[user_id]
                     return
 
-            await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب إرساله مرة أخرى.")
+            await query.message.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب إرساله مرة أخرى.")
 
     except Exception as e:
         logging.error(f"Error handling request: {e}")
-        await status_msg.edit_text("❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط أو حاول لاحقاً.")
+        await query.message.edit_text("❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط أو حاول لاحقاً.")
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(CallbackQueryHandler(handle_timer_and_show_download, pattern="^wait_timer$"))
-    app.add_handler(CallbackQueryHandler(send_final_video, pattern="^get_final_video$"))
+    app.add_handler(CallbackQueryHandler(handle_timer_and_send_video, pattern="^start_timer$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
