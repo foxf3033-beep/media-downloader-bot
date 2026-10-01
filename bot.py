@@ -49,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحجهيزه لك فوراً!\n\n"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتجهيزه لك فوراً!\n\n"
         "💻 **المطور:** wd wil"
     )
 
@@ -83,20 +83,21 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
 
     USER_URLS[user_id] = url
 
-    # يظهر زر رابط الإعلان فقط في البداية
+    # يظهر زر رابط الإعلان فقط في البداية (مع زر callback لتتبع الضغط عليه)
     keyboard = [
         [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان أولاً", url=AD_LINK)],
-        [InlineKeyboardButton("✅ اضغط هنا بعد مشاهدة الإعلان", callback_data="start_timer")]
+        [InlineKeyboardButton("✅ اضغط هنا بعد فتح رابط الإعلان", callback_data="ad_clicked")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         "📌 **خطوة واحدة متبقية:**\n\n"
-        "لتحميل الفيديو بدون علامة مائية، يرجى النقر على **رابط الدعم** أعلاه أولاً، ثم اضغط على الزر أدناه:",
+        "1️⃣ اضغط على زر رابط الإعلان أعلاه وتصفحه.\n"
+        "2️⃣ ثم اضغط على زر التأكيد أدناه للمتابعة:",
         reply_markup=reply_markup
     )
 
-async def handle_timer_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_ad_clicked(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -105,15 +106,13 @@ async def handle_timer_and_send_video(update: Update, context: ContextTypes.DEFA
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    url = USER_URLS[user_id]
+    # بمجرد الضغط، يتم إخفاء زر الإعلان وإظهار رسالة الانتظار 5 ثوانٍ
+    await query.message.edit_text("⏳ تم رصد تفاعلك، يرجى الانتظار 5 ثوانٍ ليتم جلب الفيديو...")
 
-    # إظهار رسالة الانتظار لمدة 5 ثوانٍ (كما طلبت تماماً)
-    await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
-
-    # الانتظار لمدة 5 ثوانٍ
     await asyncio.sleep(5)
 
-    # تحديث النص إلى جاري استخراج الفيديو
+    # بعد الـ 5 ثوانٍ، نبدأ بجلب الفيديو مباشرة
+    url = USER_URLS[user_id]
     await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
 
     headers = {
@@ -138,10 +137,8 @@ async def handle_timer_and_send_video(update: Update, context: ContextTypes.DEFA
                     if play_url.startswith("/"):
                         play_url = f"https://www.tikwm.com{play_url}"
                         
-                    # حذف رسالة الانتظار
                     await query.message.delete()
                     
-                    # إرسال الفيديو النهائي مباشرة للمستخدم
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
@@ -162,7 +159,7 @@ if __name__ == '__main__':
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
-    app.add_handler(CallbackQueryHandler(handle_timer_and_send_video, pattern="^start_timer$"))
+    app.add_handler(CallbackQueryHandler(handle_ad_clicked, pattern="^ad_clicked$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
     app.run_polling()
