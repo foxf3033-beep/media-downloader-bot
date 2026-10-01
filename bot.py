@@ -83,17 +83,38 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
 
     USER_URLS[user_id] = url
 
-    # الأزرار بالشكل الاحترافي المطلوب
+    # الخطوة الأولى: زر مشاهدة الإعلان فقط
     keyboard = [
-        [InlineKeyboardButton("🔗 اضغط هنا لفتح رابط الدعم والإعلان", url=AD_LINK)],
-        [InlineKeyboardButton("📥 اضغط هنا بعد مشاهدة الإعلان لتحميل الفيديو", callback_data="process_download")]
+        [InlineKeyboardButton("🔗 اضغط هنا لمشاهدة الإعلان لتحميل الفيديو", url=AD_LINK)],
+        [InlineKeyboardButton("✅ شاهدت الإعلان، المتابعة", callback_data="show_download_btn")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         "📌 **خطوة واحدة لتحميل الفيديو:**\n\n"
-        "1. افتح رابط الدعم أعلاه.\n"
-        "2. اضغط على زر التحميل أدناه مباشرة:",
+        "1. اضغط على زر مشاهدة الإعلان أعلاه.\n"
+        "2. ثم اضغط على زر المتابعة بالأسفل:",
+        reply_markup=reply_markup
+    )
+
+async def handle_show_download_btn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if user_id not in USER_URLS:
+        await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
+        return
+
+    # الخطوة الثانية: إظهار زر "اضغط هنا لفتح رابط التحميل"
+    keyboard = [
+        [InlineKeyboardButton("📥 اضغط هنا لفتح رابط التحميل", callback_data="process_download")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.edit_text(
+        "✅ شكراً لك على مشاهدة الإعلان!\n\n"
+        "اضغط على الزر أدناه لبدء استلام الفيديو:",
         reply_markup=reply_markup
     )
 
@@ -108,13 +129,9 @@ async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_
 
     url = USER_URLS[user_id]
 
-    # رسالة الانتظار لمدة 5 ثوانٍ
-    await query.message.edit_text("⏳ جاري التحقق من مشاهدة الإعلان، يرجى الانتظار 5 ثوانٍ...")
-
-    # الانتظار لمدة 5 ثوانٍ
-    await asyncio.sleep(5)
-
-    await query.message.edit_text("⏳ جاري استخراج وإرسال الفيديو...")
+    # حذف الأزرار وتأخير 7 ثوانٍ في الخلفية دون أي رسائل نصية مزعجة
+    await query.message.delete()
+    await asyncio.sleep(7)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -138,8 +155,6 @@ async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_
                     if play_url.startswith("/"):
                         play_url = f"https://www.tikwm.com{play_url}"
                         
-                    await query.message.delete()
-                    
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
@@ -149,17 +164,24 @@ async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_
                     del USER_URLS[user_id]
                     return
 
-            await query.message.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب إرساله مرة أخرى.")
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب إرساله مرة أخرى."
+            )
 
     except Exception as e:
         logging.error(f"Error handling request: {e}")
-        await query.message.edit_text("❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط أو حاول لاحقاً.")
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="❌ حدث خطأ أثناء التحميل. تأكد من صحة الرابط أو حاول لاحقاً."
+        )
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(check_subscription_button, pattern="^check_sub$"))
+    app.add_handler(CallbackQueryHandler(handle_show_download_btn, pattern="^show_download_btn$"))
     app.add_handler(CallbackQueryHandler(handle_process_download, pattern="^process_download$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tiktok_message))
     
