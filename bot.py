@@ -11,9 +11,12 @@ logging.basicConfig(
 
 BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
-# معرف القناة الخاصة بك
+# معرف القناة الخاصة بك للاشتراك الإجباري
 CHANNEL_1 = "@my_tiktok_channel_4"
 CHANNEL_2 = "@my_tiktok_channel_4"
+
+# رابط الإعلانات المباشر الخاص بك (Direct Link من Adsterra)
+AD_LINK = "https://your-ad-link-here.com"
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """التحقق من اشتراك المستخدم في القنوات"""
@@ -25,7 +28,6 @@ async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
                 return False
         except TelegramError as e:
             logging.error(f"Failed to check membership for channel {ch}: {e}")
-            # إذا حدث خطأ تقني في فحص القناة (مثل عدم كون البوت مشرفاً)، نعتبره غير مشترك لتجنب تجاوز القيد
             return False
     return True
 
@@ -48,7 +50,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
-        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية!"
+        "أرسل لي أي رابط فيديو من TikTok وسأقوم بتحميله لك فوراً وبدون علامة مائية!\n\n"
+        "💻 **المطور:** wd wil"
     )
 
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,7 +63,8 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
     if await is_user_subscribed(user_id, context):
         await query.edit_message_text(
             "✅ تم التحقق من الاشتراك بنجاح!\n\n"
-            "أرسل لي الآن أي رابط فيديو من TikTok لتحميله."
+            "أرسل لي الآن أي رابط فيديو من TikTok لتحميله.\n\n"
+            "💻 **المطور:** wd wil"
         )
     else:
         await query.answer("❌ لم تشترك في القناة بعد! يرجى الاشتراك ثم الضغط على الزر مرة أخرى.", show_alert=True)
@@ -68,7 +72,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
 async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # فحص الاشتراك بدقة
+    # فحص الاشتراك الإجباري أولاً
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
             "⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت:",
@@ -88,7 +92,7 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         async with httpx.AsyncClient(timeout=30.0, verify=False, follow_redirects=True, headers=headers) as client:
-            # معالجة الروابط المختصرة وتتبع إعادة التوجيه للحصول على الرابط الكامل
+            # معالجة الروابط المختصرة وتتبع إعادة التوجيه
             if "vt.tiktok.com" in url or "vm.tiktok.com" in url:
                 resp = await client.get(url)
                 url = str(resp.url)
@@ -105,9 +109,19 @@ async def download_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if play_url.startswith("/"):
                         play_url = f"https://www.tikwm.com{play_url}"
                         
-                    await status_msg.edit_text("⬆️ جاري إرسال الفيديو...")
-                    await update.message.reply_video(video=play_url)
                     await status_msg.delete()
+                    
+                    # زر إعلاني تحت الفيديو لتحقيق الأرباح
+                    keyboard = [
+                        [InlineKeyboardButton("🔗 اضغط هنا لدعم البوت وتوليد رابط إضافي", url=AD_LINK)]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+
+                    await update.message.reply_video(
+                        video=play_url, 
+                        caption="✅ تم تحميل الفيديو بنجاح بدون علامة مائية!\n💡 لدعم استمرار البوت مجاناً، نرجو النقر على الزر أدناه:",
+                        reply_markup=reply_markup
+                    )
                     return
 
             await status_msg.edit_text("❌ تعذر استخراج رابط الفيديو. تأكد من صحة الرابط وجرب مرة أخرى.")
