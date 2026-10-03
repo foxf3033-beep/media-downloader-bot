@@ -12,12 +12,15 @@ logging.basicConfig(
 
 BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
-# ضع معرف قناتك هنا (مثلاً: @YourChannelName)
+# معرف قناتك الخاصة
 MY_CHANNEL = "@my_tiktok_channel_4"
 
-AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
+# إعدادات موقع CutWin باستخدام رمز الـ API الخاص بك
+CUTWIN_API_TOKEN = "aa824e121cf9413b0de3c42594d50c1f34ea8df0"
 
-USER_URLS = {}
+AD_LINK_1 = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
+
+USER_DATA = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     try:
@@ -48,7 +51,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"أهلاً بك {update.effective_user.first_name}! 👋\n\n"
         "أرسل لي أي رابط فيديو من TikTok وسأقوم بتجهيزه لك فوراً!\n\n"
-        "💻 **المطور:** wd wil"
+        "💻 **المطور:** wd wleed"
     )
 
 async def check_subscription_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,7 +63,7 @@ async def check_subscription_button(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(
             "✅ تم التحقق من الاشتراك بنجاح!\n\n"
             "أرسل لي الآن أي رابط فيديو من TikTok لتحميله.\n\n"
-            "💻 **المطور:** wd wil"
+            "💻 **المطور:** wd wleed"
         )
     else:
         await query.answer("❌ لم تشترك في القناة بعد! يرجى الاشتراك ثم الضغط على الزر مرة أخرى.", show_alert=True)
@@ -70,7 +73,7 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
-            "⚠️️ عذراً، يجب عليك الاشتراك في قناتنا أولاً لاستخدام البوت:",
+            "⚠ عذراً، يجب عليك الاشتراك في قناتنا أولاً لاستخدام البوت:",
             reply_markup=get_subscribe_keyboard()
         )
         return
@@ -79,18 +82,31 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     if "tiktok.com" not in url:
         return
 
-    USER_URLS[user_id] = url
+    # محاولة اختصار الرابط تلقائياً عبر API موقع CutWin الخاص بك
+    shortened_cutwin_link = CUTWIN_API_TOKEN  # قيمة افتراضية احتياطية
+    try:
+        async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            api_url = f"https://cutw.in/api?api={CUTWIN_API_TOKEN}&url={url}"
+            resp = await client.get(api_url)
+            data = resp.json()
+            if data.get("status") == "success":
+                shortened_cutwin_link = data.get("shortenedUrl")
+    except Exception as e:
+        logging.error(f"Error shortening URL with CutWin: {e}")
 
-    # الخطوة الأولى: زر مشاهدة الإعلان فقط
+    USER_DATA[user_id] = url
+
+    # عرض أزرار الإعلانات وموقع CutWin المختصر الخاص بك
     keyboard = [
-        [InlineKeyboardButton("🔗 اضغط هنا لمشاهدة الإعلان لتحميل الفيديو", url=AD_LINK)],
-        [InlineKeyboardButton("✅ شاهدت الإعلان، المتابعة", callback_data="show_download_btn")]
+        [InlineKeyboardButton("🔗 1. زيارة الإعلان الأول", url=AD_LINK_1)],
+        [InlineKeyboardButton("🔗 2. رابط التحميل (CutWin)", url=shortened_cutwin_link)],
+        [InlineKeyboardButton("✅ تخطيت الروابط، المتابعة", callback_data="show_download_btn")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📌 **خطوة واحدة لتحميل الفيديو:**\n\n"
-        "1. اضغط على زر مشاهدة الإعلان أعلاه.\n"
+        "📌 **خطوات بسيطة لتحميل الفيديو:**\n\n"
+        "1. قم بزيارة الروابط أعلاه.\n"
         "2. ثم اضغط على زر المتابعة بالأسفل:",
         reply_markup=reply_markup
     )
@@ -100,19 +116,18 @@ async def handle_show_download_btn(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     user_id = query.from_user.id
 
-    if user_id not in USER_URLS:
+    if user_id not in USER_DATA:
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    # الخطوة الثانية: إظهار زر "اضغط هنا لفتح رابط التحميل"
     keyboard = [
-        [InlineKeyboardButton("📥 اضغط هنا لفتح رابط التحميل", callback_data="process_download")]
+        [InlineKeyboardButton("📥 اضغط هنا لاستلام الفيديو", callback_data="process_download")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.message.edit_text(
-        "✅ شكراً لك على مشاهدة الإعلان!\n\n"
-        "اضغط على الزر أدناه لبدء استلام الفيديو:",
+        "✅ شكراً لك!\n\n"
+        "اضغط على الزر أدناه لاستلام الفيديو الخاص بك:",
         reply_markup=reply_markup
     )
 
@@ -121,13 +136,12 @@ async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     user_id = query.from_user.id
 
-    if user_id not in USER_URLS:
+    if user_id not in USER_DATA:
         await query.answer("⚠️ انتهت صلاحية الجلسة، يرجى إرسال الرابط من جديد.", show_alert=True)
         return
 
-    url = USER_URLS[user_id]
+    url = USER_DATA[user_id]
 
-    # حذف الأزرار وتأخير 7 ثوانٍ في الخلفية دون أي رسائل نصية مزعجة
     await query.message.delete()
     await asyncio.sleep(7)
 
@@ -156,10 +170,10 @@ async def handle_process_download(update: Update, context: ContextTypes.DEFAULT_
                     await context.bot.send_video(
                         chat_id=query.message.chat_id,
                         video=play_url, 
-                        caption="✅ تفضل فيديو تيك توك الخاص بك بدون علامة مائية! 🚀\n\n💻 **المطور:** wd wil"
+                        caption="✅ تفضل فيديو تيك توك الخاص بك بدون علامة مائية! 🚀\n\n💻 **المطور:** wd wleed"
                     )
                     
-                    del USER_URLS[user_id]
+                    del USER_DATA[user_id]
                     return
 
             await context.bot.send_message(
