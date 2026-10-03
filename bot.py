@@ -12,28 +12,26 @@ logging.basicConfig(
 
 BOT_TOKEN = "8922544964:AAHreUn_UkIamBmtvNi5uyaGpd6qvfEq3LY"
 
-CHANNEL_1 = "@my_tiktok_channel_4"
-CHANNEL_2 = "@my_tiktok_channel_4"
+# ضع معرف قناتك هنا (مثلاً: @YourChannelName)
+MY_CHANNEL = "@my_tiktok_channel_4"
 
 AD_LINK = "https://www.profitableratecpmnetwork.com/kc0ukqgr?key=265d6e72d7a3c187616e16bce28bf1aa"
 
 USER_URLS = {}
 
 async def is_user_subscribed(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    channels = list(set([CHANNEL_1, CHANNEL_2]))
-    for ch in channels:
-        try:
-            member = await context.bot.get_chat_member(chat_id=ch, user_id=user_id)
-            if member.status in ['left', 'kicked']:
-                return False
-        except TelegramError as e:
-            logging.error(f"Failed to check membership for channel {ch}: {e}")
+    try:
+        member = await context.bot.get_chat_member(chat_id=MY_CHANNEL, user_id=user_id)
+        if member.status in ['left', 'kicked']:
             return False
+    except TelegramError as e:
+        logging.error(f"Failed to check membership for channel {MY_CHANNEL}: {e}")
+        return False
     return True
 
 def get_subscribe_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
-        [InlineKeyboardButton("📢 قناة البوت الرسمية", url=f"https://t.me/{CHANNEL_1.replace('@', '')}")],
+        [InlineKeyboardButton("📢 اشترك في قناتنا الرسمية", url=f"https://t.me/{MY_CHANNEL.replace('@', '')}")],
         [InlineKeyboardButton("✅ اشتركت، تحقق الآن", callback_data="check_sub")]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -42,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
-            "⚠️ لاستخدام البوت، يجب عليك الاشتراك في قناة البوت أولاً:",
+            "⚠️ لاستخدام البوت، يجب عليك الاشتراك في قناتنا أولاً:",
             reply_markup=get_subscribe_keyboard()
         )
         return
@@ -72,7 +70,7 @@ async def handle_tiktok_message(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not await is_user_subscribed(user_id, context):
         await update.message.reply_text(
-            "⚠️ عذراً، يجب عليك الاشتراك في القناة أولاً لاستخدام البوت:",
+            "⚠️️ عذراً، يجب عليك الاشتراك في قناتنا أولاً لاستخدام البوت:",
             reply_markup=get_subscribe_keyboard()
         )
         return
